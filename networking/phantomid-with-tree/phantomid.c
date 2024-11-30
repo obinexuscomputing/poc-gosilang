@@ -1,11 +1,4 @@
-#include <string.h>
-#include <time.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>     
-#include <openssl/evp.h>
-#include <openssl/rand.h>
-#include <assert.h>
+
 #include "phantomid.h"
 #include "network.h"
 
@@ -483,7 +476,7 @@ void phantom_cleanup(PhantomDaemon* phantom) {
     pthread_mutex_destroy(&phantom->state_lock);
 }
 
-// Message handling
+
 
 // Network callbacks implementation
 void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
@@ -499,11 +492,9 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
         .flags = 0
     };
 
-
     // Parse command
     if (strncmp(data, "create", 6) == 0) {
         char parent_id[65] = {0};
-        // Check if parent ID is provided
         if (sscanf(data + 6, "%64s", parent_id) == 1) {
             PhantomAccount account = {0};
             generate_seed(account.seed);
@@ -524,7 +515,6 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
                         phantom_get_error());
             }
         } else {
-            // Create root node if tree is empty
             PhantomAccount account = {0};
             generate_seed(account.seed);
             generate_id(account.seed, account.id);
@@ -575,33 +565,28 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
                     "\nInvalid message format. Use: msg <from_id> <to_id> <message>\n");
         }
     }
-    else  if (strncmp(data, "list", 4) == 0) {
+    else if (strncmp(data, "list", 4) == 0) {
         if (strncmp(data + 4, " bfs", 4) == 0) {
             snprintf(response, sizeof(response), "\nTree Structure (BFS):\n");
-            size_t offset = strlen(response);
-            
-            // Actually use the context for tree traversal
             struct PrintContext {
                 char* buffer;
                 size_t offset;
                 size_t max_size;
-            } print_ctx = {response, offset, sizeof(response)};
+            } print_ctx = {response, strlen(response), sizeof(response)};
             
             phantom_tree_bfs(endpoint->phantom, print_node, &print_ctx);
-            
-            // Update response size based on context
             resp.size = print_ctx.offset;
         }
         else if (strncmp(data + 4, " dfs", 4) == 0) {
             snprintf(response, sizeof(response), "\nTree Structure (DFS):\n");
-            size_t offset = strlen(response);
-            struct {
+            struct PrintContext {
                 char* buffer;
                 size_t offset;
                 size_t max_size;
-            } ctx = {response, offset, sizeof(response)};
+            } print_ctx = {response, strlen(response), sizeof(response)};
             
-            phantom_tree_dfs(endpoint->phantom, print_node, &ctx);
+            phantom_tree_dfs(endpoint->phantom, print_node, &print_ctx);
+            resp.size = print_ctx.offset;
         }
         else {
             size_t total = phantom_tree_size(endpoint->phantom);
@@ -615,15 +600,15 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
                     "Root Node: %s\n\n",
                     total, depth,
                     has_root ? "Present" : "Not Present");
-                    
-            size_t offset = strlen(response);
-            struct {
+            
+            struct PrintContext {
                 char* buffer;
                 size_t offset;
                 size_t max_size;
-            } ctx = {response, offset, sizeof(response)};
+            } print_ctx = {response, strlen(response), sizeof(response)};
             
             phantom_tree_print(endpoint->phantom);
+            resp.size = print_ctx.offset;
         }
     }
     else if (strncmp(data, "help", 4) == 0) {
@@ -649,13 +634,15 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
                 "\nUnknown command. Type 'help' for available commands.\n");
     }
     
-  
-    resp.size = strlen(response);
+    // Set response size if not already set by specific commands
+    if (resp.size == 0) {
+        resp.size = strlen(response);
+    }
+
     if (net_send(endpoint, &resp) < 0) {
         printf("Failed to send response to client\n");
     }
 }
-
 // Network callbacks with proper usage of parameters
 void phantom_on_client_connect(NetworkEndpoint* endpoint) {
     char addr[INET_ADDRSTRLEN];
@@ -685,7 +672,6 @@ void phantom_run(PhantomDaemon* phantom) {
     printf("PhantomID daemon stopped\n");
 }
 
-
 // Message sending implementation
 bool phantom_message_send(PhantomDaemon* phantom, const char* from_id,
                          const char* to_id, const char* content) {
@@ -703,7 +689,7 @@ bool phantom_message_send(PhantomDaemon* phantom, const char* from_id,
         return false;
     }
     
-    // In a real implementation, you'd queue the message for delivery
+    // In a real implementation, I'd queue the message for delivery
     // For now, just log it
     printf("Message from %s to %s: %s\n", from_id, to_id, content);
     return true;

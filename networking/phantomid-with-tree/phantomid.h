@@ -10,6 +10,7 @@
 #include <openssl/rand.h>
 #include <assert.h>
 #include "network.h"
+#include <arpa/inet.h>
 
 // Function declarations at the top of phantomid.c
 // Network function declarations if not in network.h

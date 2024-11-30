@@ -5,11 +5,12 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>  // For inet_ntop
 #include <pthread.h>
 
-// Constants
-#define NET_MAX_CLIENTS        10      // Maximum number of concurrent clients
-#define NET_BUFFER_SIZE        1024    // Default buffer size for network operations
+// Network Constants
+#define NET_MAX_CLIENTS 10
+#define NET_BUFFER_SIZE 1024
 
 // Forward declaration of PhantomDaemon
 typedef struct PhantomDaemon PhantomDaemon;
@@ -34,63 +35,52 @@ typedef enum {
 
 // Thread-safe client state
 typedef struct {
-    pthread_mutex_t lock;           // Mutex for thread-safe access
-    bool is_active;                 // Is this client slot active?
-    int socket_fd;                  // Client socket
-    struct sockaddr_in addr;        // Client address
+    pthread_mutex_t lock;
+    bool is_active;
+    int socket_fd;
+    struct sockaddr_in addr;
 } ClientState;
 
 // Thread-safe endpoint structure
 typedef struct {
-    pthread_mutex_t lock;           // Mutex for thread-safe access
-    char address[INET_ADDRSTRLEN];  // IP address
-    uint16_t port;                  // Port number
-    NetworkProtocol protocol;       // TCP/UDP
-    NetworkRole role;               // Server/Client/Peer
-    NetworkMode mode;               // Blocking/Non-blocking
-    int socket_fd;                  // Socket file descriptor
-    struct sockaddr_in addr;        // Socket address
-    PhantomDaemon* phantom;         // Reference to PhantomDaemon
+    pthread_mutex_t lock;
+    char address[INET_ADDRSTRLEN];
+    uint16_t port;
+    NetworkProtocol protocol;
+    NetworkRole role;
+    NetworkMode mode;
+    int socket_fd;
+    struct sockaddr_in addr;
+    PhantomDaemon* phantom;
 } NetworkEndpoint;
 
 // Network packet with thread safety
 typedef struct {
-    void* data;                     // Packet data
-    size_t size;                    // Data size
-    uint32_t flags;                 // Packet flags
-    pthread_mutex_t lock;           // Mutex for thread-safe access
+    void* data;
+    size_t size;
+    uint32_t flags;
+    pthread_mutex_t lock;
 } NetworkPacket;
 
 // Thread-safe program state
 typedef struct {
-    NetworkEndpoint* endpoints;     // Array of endpoints
-    size_t count;                   // Number of endpoints
-    ClientState clients[NET_MAX_CLIENTS]; // Array of client states
-    pthread_mutex_t clients_lock;   // Mutex for client list access
-    volatile bool running;          // Server running state
+    NetworkEndpoint* endpoints;
+    size_t count;
+    ClientState clients[NET_MAX_CLIENTS];
+    pthread_mutex_t clients_lock;
+    volatile bool running;
     struct {
-        void (*on_receive)(NetworkEndpoint*, NetworkPacket*);  // Receive callback
-        void (*on_connect)(NetworkEndpoint*);                  // Connect callback
-        void (*on_disconnect)(NetworkEndpoint*);               // Disconnect callback
+        void (*on_receive)(NetworkEndpoint*, NetworkPacket*);
+        void (*on_connect)(NetworkEndpoint*);
+        void (*on_disconnect)(NetworkEndpoint*);
     } handlers;
-    PhantomDaemon* phantom;         // Reference to PhantomDaemon
+    PhantomDaemon* phantom;
 } NetworkProgram;
 
-// Function declarations
+// Core network functions
 bool net_init(NetworkEndpoint* endpoint);
 void net_close(NetworkEndpoint* endpoint);
-ssize_t net_send(NetworkEndpoint* endpoint, NetworkPacket* packet);
-ssize_t net_receive(NetworkEndpoint* endpoint, NetworkPacket* packet);
-
-// Client management
-void net_init_client_state(ClientState* state);
-void net_cleanup_client_state(ClientState* state);
-bool net_add_client(NetworkProgram* program, int socket_fd, struct sockaddr_in addr);
-void net_remove_client(NetworkProgram* program, int socket_fd);
-
-// Program management
-void net_init_program(NetworkProgram* program);
-void net_cleanup_program(NetworkProgram* program);
-void net_run(NetworkProgram* program);
+int net_send(NetworkEndpoint* endpoint, NetworkPacket* packet);
+void net_run(NetworkProgram* program);  // Changed to void return type
 
 #endif // NETWORK_H
