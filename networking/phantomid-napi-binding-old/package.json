@@ -1,10 +1,14 @@
 {
-    "type": "module",
-    "exports": {
-      ".": {
-        "import": "./phantom.mjs",
-        "require": "./phantom.cjs"
-      },
-      "./native": "./build/Release/phantom_binding.node"
-    }
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./phantom.mjs",
+      "require": "./phantom.cjs"
+    },
+    "./native": "./build/Release/phantom_binding.node"
+  },
+  "scripts": {
+    "start": "node --experimental-loader=./phantom-loader.mjs index.mjs",
+    "debug": "node --experimental-loader=./phantom-loader.mjs --inspect index.mjs"
   }
+}
