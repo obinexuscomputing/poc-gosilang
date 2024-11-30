@@ -1,0 +1,10 @@
+{
+    "type": "module",
+    "exports": {
+      ".": {
+        "import": "./phantom.mjs",
+        "require": "./phantom.cjs"
+      },
+      "./native": "./build/Release/phantom_binding.node"
+    }
+  }
