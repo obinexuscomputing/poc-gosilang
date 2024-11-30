@@ -499,6 +499,7 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
         .flags = 0
     };
 
+
     // Parse command
     if (strncmp(data, "create", 6) == 0) {
         char parent_id[65] = {0};
@@ -574,18 +575,22 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
                     "\nInvalid message format. Use: msg <from_id> <to_id> <message>\n");
         }
     }
-    else if (strncmp(data, "list", 4) == 0) {
+    else  if (strncmp(data, "list", 4) == 0) {
         if (strncmp(data + 4, " bfs", 4) == 0) {
             snprintf(response, sizeof(response), "\nTree Structure (BFS):\n");
             size_t offset = strlen(response);
-            struct {
+            
+            // Actually use the context for tree traversal
+            struct PrintContext {
                 char* buffer;
                 size_t offset;
                 size_t max_size;
-            } ctx = {response, offset, sizeof(response)};
+            } print_ctx = {response, offset, sizeof(response)};
             
-            phantom_tree_bfs(endpoint->phantom, print_node, &ctx);
+            phantom_tree_bfs(endpoint->phantom, print_node, &print_ctx);
             
+            // Update response size based on context
+            resp.size = print_ctx.offset;
         }
         else if (strncmp(data + 4, " dfs", 4) == 0) {
             snprintf(response, sizeof(response), "\nTree Structure (DFS):\n");
@@ -644,8 +649,9 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
                 "\nUnknown command. Type 'help' for available commands.\n");
     }
     
+  
     resp.size = strlen(response);
-    if (send_network_data(endpoint, &resp) < 0) {
+    if (net_send(endpoint, &resp) < 0) {
         printf("Failed to send response to client\n");
     }
 }
@@ -669,16 +675,10 @@ void phantom_on_client_disconnect(NetworkEndpoint* endpoint) {
 void phantom_run(PhantomDaemon* phantom) {
     if (!phantom) return;
     
-    NetworkProgram* network = &phantom->network;
-    
-    // No need to set handlers here as they're already set in phantom_init
     printf("PhantomID daemon running...\n");
     
     while (phantom->running) {
-        // Use the network layer's run function
-        net_run(network);
-        
-        // Add a small sleep to prevent CPU hogging
+        net_run(&phantom->network);
         usleep(100000); // 100ms
     }
     
