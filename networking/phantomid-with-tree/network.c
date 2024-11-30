@@ -21,9 +21,66 @@ void net_cleanup_client_state(ClientState* state) {
     pthread_mutex_destroy(&state->lock);
 }
 
-// Initialize network endpoint
+bool net_is_port_in_use(uint16_t port) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return true;  // Error on the safe side
+    
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(port),
+        .sin_addr.s_addr = INADDR_ANY
+    };
+    
+    int result = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
+    close(sock);
+    
+    return result < 0;
+}
+
+// Attempt to release port
+bool net_release_port(uint16_t port) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return false;
+    
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(port),
+        .sin_addr.s_addr = INADDR_ANY
+    };
+    
+    // Set SO_REUSEADDR
+    int opt = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    
+    // Attempt to bind and immediately close
+    int result = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
+    close(sock);
+    
+    // Small delay to ensure port is released
+    usleep(100000);  // 100ms
+    
+    return result >= 0;
+}
+
+// Update net_init to include port checking and cleanup
 bool net_init(NetworkEndpoint* endpoint) {
     if (!endpoint) return false;
+    
+    // Check if port is in use
+    if (net_is_port_in_use(endpoint->port)) {
+        printf("Port %d is in use, attempting to release...\n", endpoint->port);
+        if (!net_release_port(endpoint->port)) {
+            printf("Failed to release port %d\n", endpoint->port);
+            printf("Please try:\n");
+            printf("1. Wait a few seconds and try again\n");
+            printf("2. Use a different port with -p option\n");
+            printf("3. Or manually kill the process using the port:\n");
+            printf("   sudo lsof -i :%d\n", endpoint->port);
+            printf("   sudo kill <PID>\n");
+            return false;
+        }
+        printf("Successfully released port %d\n", endpoint->port);
+    }
     
     pthread_mutex_init(&endpoint->lock, NULL);
     pthread_mutex_lock(&endpoint->lock);
@@ -36,6 +93,7 @@ bool net_init(NetworkEndpoint* endpoint) {
     if (endpoint->socket_fd < 0) {
         perror("Socket creation failed");
         pthread_mutex_unlock(&endpoint->lock);
+        pthread_mutex_destroy(&endpoint->lock);
         return false;
     }
 
@@ -45,15 +103,14 @@ bool net_init(NetworkEndpoint* endpoint) {
         perror("setsockopt failed");
         close(endpoint->socket_fd);
         pthread_mutex_unlock(&endpoint->lock);
+        pthread_mutex_destroy(&endpoint->lock);
         return false;
     }
     
     // Configure address
-    struct sockaddr_in addr = {0};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(endpoint->port);
-    addr.sin_addr.s_addr = INADDR_ANY;
-    endpoint->addr = addr;
+    endpoint->addr.sin_family = AF_INET;
+    endpoint->addr.sin_port = htons(endpoint->port);
+    endpoint->addr.sin_addr.s_addr = INADDR_ANY;
     
     // For server endpoints
     if (endpoint->role == NET_SERVER) {
@@ -61,14 +118,16 @@ bool net_init(NetworkEndpoint* endpoint) {
             perror("Bind failed");
             close(endpoint->socket_fd);
             pthread_mutex_unlock(&endpoint->lock);
+            pthread_mutex_destroy(&endpoint->lock);
             return false;
         }
         
         if (endpoint->protocol == NET_TCP) {
-            if (listen(endpoint->socket_fd, 5) < 0) {
+            if (listen(endpoint->socket_fd, NET_MAX_CLIENTS) < 0) {
                 perror("Listen failed");
                 close(endpoint->socket_fd);
                 pthread_mutex_unlock(&endpoint->lock);
+                pthread_mutex_destroy(&endpoint->lock);
                 return false;
             }
         }
@@ -78,15 +137,24 @@ bool net_init(NetworkEndpoint* endpoint) {
     return true;
 }
 
-// Close network endpoint
+// Update net_close to ensure complete cleanup
 void net_close(NetworkEndpoint* endpoint) {
     if (!endpoint) return;
+    
     pthread_mutex_lock(&endpoint->lock);
+    
     if (endpoint->socket_fd > 0) {
+        // Set linger to ensure complete socket shutdown
+        struct linger ling = {1, 0};  // Immediate shutdown
+        setsockopt(endpoint->socket_fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling));
+        
+        shutdown(endpoint->socket_fd, SHUT_RDWR);  // Shutdown both directions
         close(endpoint->socket_fd);
         endpoint->socket_fd = 0;
     }
+    
     pthread_mutex_unlock(&endpoint->lock);
+    pthread_mutex_destroy(&endpoint->lock);
 }
 
 // Send data through network endpoint
