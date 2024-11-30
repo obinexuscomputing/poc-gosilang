@@ -663,12 +663,17 @@ void phantom_run(PhantomDaemon* phantom) {
     if (!phantom) return;
     
     printf("PhantomID daemon running...\n");
+    phantom->running = true;  // Set running flag
+
+    NetworkProgram* network = &phantom->network;
+    network->running = true;  // Set network running flag
     
     while (phantom->running) {
-        net_run(&phantom->network);
-        usleep(100000); // 100ms
+        net_run(network);  // This should block until there's activity
+        if (!phantom->running) break;  // Check if we should stop
     }
-    
+
+    network->running = false;  // Clear network running flag
     printf("PhantomID daemon stopped\n");
 }
 

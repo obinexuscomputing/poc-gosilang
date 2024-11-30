@@ -187,99 +187,119 @@ void net_cleanup_program(NetworkProgram* program) {
 
 // Run network program
 void net_run(NetworkProgram* program) {
-    if (!program) return;
-    
+    if (!program || !program->running) return;
+
     fd_set readfds;
-    int max_sd;
-    char buffer[NET_BUFFER_SIZE];
+    struct timeval tv = {
+        .tv_sec = 1,  // 1 second timeout
+        .tv_usec = 0
+    };
+
+    // Setup file descriptors
+    FD_ZERO(&readfds);
+    int max_fd = program->endpoints[0].socket_fd;
+    FD_SET(max_fd, &readfds);
+
+    // Add active clients
+    pthread_mutex_lock(&program->clients_lock);
+    for (int i = 0; i < NET_MAX_CLIENTS; i++) {
+        pthread_mutex_lock(&program->clients[i].lock);
+        if (program->clients[i].is_active) {
+            int fd = program->clients[i].socket_fd;
+            FD_SET(fd, &readfds);
+            if (fd > max_fd) max_fd = fd;
+        }
+        pthread_mutex_unlock(&program->clients[i].lock);
+    }
+    pthread_mutex_unlock(&program->clients_lock);
+
+    // Wait for activity with timeout
+    int activity = select(max_fd + 1, &readfds, NULL, NULL, &tv);
     
-    net_init_program(program);
-    printf("Server started, waiting for connections...\n");
-
-    while (program->running) {
-        FD_ZERO(&readfds);
-        max_sd = 0;
-
-        // Add main server socket
-        pthread_mutex_lock(&program->endpoints[0].lock);
-        FD_SET(program->endpoints[0].socket_fd, &readfds);
-        max_sd = program->endpoints[0].socket_fd;
-        pthread_mutex_unlock(&program->endpoints[0].lock);
-
-        // Add client sockets
-        pthread_mutex_lock(&program->clients_lock);
-        for (int i = 0; i < NET_MAX_CLIENTS; i++) {
-            pthread_mutex_lock(&program->clients[i].lock);
-            if (program->clients[i].is_active) {
-                FD_SET(program->clients[i].socket_fd, &readfds);
-                if (program->clients[i].socket_fd > max_sd) {
-                    max_sd = program->clients[i].socket_fd;
-                }
-            }
-            pthread_mutex_unlock(&program->clients[i].lock);
+    if (activity < 0) {
+        if (errno != EINTR) {
+            perror("select error");
         }
-        pthread_mutex_unlock(&program->clients_lock);
+        return;
+    }
 
-        // Wait for activity
-        int activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
-        if (activity < 0) continue;
+    // Handle new connections
+    if (FD_ISSET(program->endpoints[0].socket_fd, &readfds)) {
+        struct sockaddr_in client_addr;
+        socklen_t addr_len = sizeof(client_addr);
+        
+        int new_socket = accept(program->endpoints[0].socket_fd,
+                              (struct sockaddr*)&client_addr,
+                              &addr_len);
 
-        // Check server socket
-        if (FD_ISSET(program->endpoints[0].socket_fd, &readfds)) {
-            struct sockaddr_in client_addr;
-            socklen_t addr_len = sizeof(client_addr);
-            int new_socket = accept(program->endpoints[0].socket_fd,
-                                  (struct sockaddr*)&client_addr, 
-                                  &addr_len);
+        if (new_socket >= 0) {
+            // Set non-blocking mode
+            int flags = fcntl(new_socket, F_GETFL, 0);
+            fcntl(new_socket, F_SETFL, flags | O_NONBLOCK);
 
-            if (new_socket >= 0) {
-                if (net_add_client(program, new_socket, client_addr)) {
-                    NetworkEndpoint client_endpoint = {0};
-                    client_endpoint.socket_fd = new_socket;
-                    client_endpoint.addr = client_addr;
-                    if (program->handlers.on_connect) {
-                        program->handlers.on_connect(&client_endpoint);
-                    }
-                }
-            }
-        }
-
-        // Check client sockets
-        pthread_mutex_lock(&program->clients_lock);
-        for (int i = 0; i < NET_MAX_CLIENTS; i++) {
-            pthread_mutex_lock(&program->clients[i].lock);
-            if (program->clients[i].is_active && 
-                FD_ISSET(program->clients[i].socket_fd, &readfds)) {
+            // Add client
+            if (net_add_client(program, new_socket, client_addr)) {
+                NetworkEndpoint client_endpoint = {
+                    .socket_fd = new_socket,
+                    .addr = client_addr,
+                    .phantom = program->phantom
+                };
                 
+                if (program->handlers.on_connect) {
+                    program->handlers.on_connect(&client_endpoint);
+                }
+            } else {
+                close(new_socket);
+            }
+        }
+    }
+
+    // Handle client data
+    pthread_mutex_lock(&program->clients_lock);
+    for (int i = 0; i < NET_MAX_CLIENTS; i++) {
+        pthread_mutex_lock(&program->clients[i].lock);
+        if (program->clients[i].is_active &&
+            FD_ISSET(program->clients[i].socket_fd, &readfds)) {
+            
+            char buffer[NET_BUFFER_SIZE];
+            ssize_t bytes_read = recv(program->clients[i].socket_fd,
+                                    buffer,
+                                    sizeof(buffer) - 1,
+                                    0);
+
+            if (bytes_read <= 0) {
+                // Handle disconnection
                 NetworkEndpoint client_endpoint = {
                     .socket_fd = program->clients[i].socket_fd,
                     .addr = program->clients[i].addr,
                     .phantom = program->phantom
                 };
+
+                if (program->handlers.on_disconnect) {
+                    program->handlers.on_disconnect(&client_endpoint);
+                }
                 
+                net_remove_client(program, program->clients[i].socket_fd);
+            } else {
+                // Handle received data
+                NetworkEndpoint client_endpoint = {
+                    .socket_fd = program->clients[i].socket_fd,
+                    .addr = program->clients[i].addr,
+                    .phantom = program->phantom
+                };
+
                 NetworkPacket packet = {
                     .data = buffer,
-                    .size = NET_BUFFER_SIZE,
+                    .size = bytes_read,
                     .flags = 0
                 };
 
-                ssize_t valread = net_receive(&client_endpoint, &packet);
-                
-                if (valread <= 0) {
-                    if (program->handlers.on_disconnect) {
-                        program->handlers.on_disconnect(&client_endpoint);
-                    }
-                    net_remove_client(program, program->clients[i].socket_fd);
-                }
-                else if (program->handlers.on_receive) {
-                    packet.size = valread;
+                if (program->handlers.on_receive) {
                     program->handlers.on_receive(&client_endpoint, &packet);
                 }
             }
-            pthread_mutex_unlock(&program->clients[i].lock);
         }
-        pthread_mutex_unlock(&program->clients_lock);
+        pthread_mutex_unlock(&program->clients[i].lock);
     }
-
-    net_cleanup_program(program);
+    pthread_mutex_unlock(&program->clients_lock);
 }
