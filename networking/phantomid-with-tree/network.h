@@ -7,6 +7,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>      
 
 // Network Constants
 #define NET_MAX_CLIENTS 10

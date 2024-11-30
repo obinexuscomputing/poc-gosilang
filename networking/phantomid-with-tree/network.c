@@ -1,8 +1,4 @@
-#include <string.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <arpa/inet.h>
-#include <errno.h>
+
 #include "network.h"
 
 // Initialize client state
@@ -233,9 +229,11 @@ void net_run(NetworkProgram* program) {
                               &addr_len);
 
         if (new_socket >= 0) {
-            // Set non-blocking mode
+            // Set socket to non-blocking mode
             int flags = fcntl(new_socket, F_GETFL, 0);
-            fcntl(new_socket, F_SETFL, flags | O_NONBLOCK);
+            if (flags >= 0) {
+                fcntl(new_socket, F_SETFL, flags | O_NONBLOCK);
+            }
 
             // Add client
             if (net_add_client(program, new_socket, client_addr)) {
