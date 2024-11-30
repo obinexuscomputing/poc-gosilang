@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>  // For inet_ntop
+#include <arpa/inet.h>
 #include <pthread.h>
 
 // Network Constants
@@ -80,7 +80,7 @@ typedef struct {
 // Core network functions
 bool net_init(NetworkEndpoint* endpoint);
 void net_close(NetworkEndpoint* endpoint);
-int net_send(NetworkEndpoint* endpoint, NetworkPacket* packet);
-void net_run(NetworkProgram* program);  // Changed to void return type
+ssize_t net_send(NetworkEndpoint* endpoint, NetworkPacket* packet);
+void net_run(NetworkProgram* program);
 
 #endif // NETWORK_H
