@@ -5,11 +5,19 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #define sleep(x) Sleep(x * 1000)
+    #define usleep(x) Sleep(x / 1000)
+#else
+    #include <unistd.h>
+    #include <arpa/inet.h>
+#endif
+
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <assert.h>
-#include <arpa/inet.h>
 #include "network.h"
 
 #define MAX_ACCOUNTS 1000

@@ -1,17 +1,34 @@
 #ifndef NETWORK_H
 #define NETWORK_H
-
 #include <stdint.h>
 #include <stdbool.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <windows.h>
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+#endif
+
 #include <pthread.h>
 #include <string.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
+
+// Windows compatibility defines
+#ifdef _WIN32
+    #define sleep(x) Sleep(x * 1000)
+    #define usleep(x) Sleep(x / 1000)
+    typedef int socklen_t;
+    #define close closesocket
+#else
+    #include <unistd.h>
+#endif
+
 
 // Network Constants
 #define NET_MAX_CLIENTS 10
