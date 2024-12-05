@@ -6,6 +6,15 @@
 #include <errno.h>
 #include "phantomid.h"
 
+
+#ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        fprintf(stderr, "Failed to initialize Winsock\n");
+        return 1;
+    }
+#endif
+
 static PhantomDaemon phantom_daemon;
 static volatile bool running = true;
 
@@ -147,3 +156,7 @@ int main(int argc, char* argv[]) {
     
     return 0;
 }
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
