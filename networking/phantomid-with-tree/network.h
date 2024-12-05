@@ -49,21 +49,6 @@ typedef enum {
     NET_ROLE_MAX      // Role count
 } NetworkRole;
 
-// Network Mode Types
-typedef enum {
-    NET_BLOCKING,      // Blocking mode
-    NET_NONBLOCKING,   // Non-blocking mode
-    NET_MODE_MAX      // Mode count
-} NetworkMode;
-
-// Network Socket State
-typedef enum {
-    NET_STATE_CLOSED,      // Socket is closed
-    NET_STATE_LISTENING,   // Server is listening
-    NET_STATE_CONNECTED,   // Client is connected
-    NET_STATE_ERROR       // Error state
-} NetworkState;
-
 // Forward declaration
 typedef struct PhantomDaemon PhantomDaemon;
 
@@ -73,10 +58,6 @@ typedef struct {
     bool is_active;                 // Active flag
     int socket_fd;                  // Socket descriptor
     struct sockaddr_in addr;        // Client address
-    NetworkState state;             // Connection state
-    time_t connect_time;            // Connection timestamp
-    uint64_t bytes_sent;           // Total bytes sent
-    uint64_t bytes_received;       // Total bytes received
 } ClientState;
 
 // Network Endpoint
@@ -86,32 +67,16 @@ typedef struct {
     uint16_t port;                  // Port number
     NetworkProtocol protocol;       // Protocol type
     NetworkRole role;               // Endpoint role
-    NetworkMode mode;               // Socket mode
-    NetworkState state;             // Current state
     int socket_fd;                  // Socket descriptor
     struct sockaddr_in addr;        // Socket address
     PhantomDaemon* phantom;         // Phantom daemon reference
-    struct {
-        int backlog;                // Listen backlog
-        bool reuse_addr;            // Address reuse
-        bool keep_alive;            // Keep-alive
-        int timeout_sec;            // Timeout seconds
-        int timeout_usec;           // Timeout microseconds
-    } options;
 } NetworkEndpoint;
 
 // Network Packet
 typedef struct {
-    pthread_mutex_t lock;           // Packet mutex
     void* data;                     // Packet data
     size_t size;                    // Data size
     uint32_t flags;                 // Packet flags
-    struct {
-        uint32_t sequence;          // Sequence number
-        uint32_t ack;              // Acknowledgment
-        time_t timestamp;          // Packet timestamp
-        NetworkError error;        // Error code
-    } header;
 } NetworkPacket;
 
 // Network Program
@@ -133,12 +98,15 @@ typedef struct {
 bool net_init(NetworkEndpoint* endpoint);
 void net_close(NetworkEndpoint* endpoint);
 ssize_t net_send(NetworkEndpoint* endpoint, NetworkPacket* packet);
+ssize_t net_receive(NetworkEndpoint* endpoint, NetworkPacket* packet);
 void net_run(NetworkProgram* program);
 
 // Utility Functions
 bool net_is_port_in_use(uint16_t port);
 bool net_release_port(uint16_t port);
-NetworkError net_get_last_error(void);
-const char* net_error_string(NetworkError error);
+void net_init_client_state(ClientState* state);
+void net_cleanup_client_state(ClientState* state);
+void net_init_program(NetworkProgram* program);
+void net_cleanup_program(NetworkProgram* program);
 
 #endif // NETWORK_H

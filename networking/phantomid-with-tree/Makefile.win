@@ -1,0 +1,79 @@
+# Windows compiler and tools
+CC := gcc
+RM := del /Q
+
+# OpenSSL configuration for Windows
+# Adjust these paths to match your OpenSSL installation
+OPENSSL_DIR := C:/OpenSSL-Win64
+OPENSSL_INCLUDE := -I$(OPENSSL_DIR)/include
+OPENSSL_LIBS := -L$(OPENSSL_DIR)/lib -lssl -lcrypto
+
+# Compiler flags
+CFLAGS := -Wall -Wextra -O2 $(OPENSSL_INCLUDE)
+LDFLAGS := -pthread
+LIBS := $(OPENSSL_LIBS) -lws2_32
+
+# Directories (Windows style)
+SRC_DIR := .
+OBJ_DIR := obj
+BIN_DIR := bin
+
+# Source files
+SRCS := main.c network.c phantomid.c
+OBJS := $(SRCS:%.c=$(OBJ_DIR)/%.o)
+
+# Binary name
+TARGET := $(BIN_DIR)/phantomid.exe
+
+# Header files
+DEPS := network.h phantomid.h
+
+# Create directories if they don't exist
+$(shell if not exist $(OBJ_DIR) mkdir $(OBJ_DIR))
+$(shell if not exist $(BIN_DIR) mkdir $(BIN_DIR))
+
+# Default target
+.PHONY: all
+all: $(TARGET)
+
+# Link the final binary
+$(TARGET): $(OBJS)
+	$(CC) $(OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+# Compile source files
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Clean build files
+.PHONY: clean
+clean:
+	$(RM) $(OBJ_DIR)\*.o
+	$(RM) $(BIN_DIR)\*.exe
+
+# Debug build
+.PHONY: debug
+debug: CFLAGS += -g -DDEBUG
+debug: clean all
+
+# Run the program
+.PHONY: run
+run: $(TARGET)
+	$(TARGET)
+
+# Help target
+.PHONY: help
+help:
+	@echo PhantomID Build System for Windows
+	@echo -------------------------------
+	@echo Available targets:
+	@echo   all      - Build the project (default)
+	@echo   clean    - Remove build files
+	@echo   debug    - Build with debug symbols
+	@echo   run      - Build and run the program
+	@echo   help     - Show this help message
+	@echo.
+	@echo Requirements:
+	@echo   - MinGW-w64 with POSIX threads
+	@echo   - OpenSSL for Windows (64-bit)
+	@echo.
+	@echo Important: Adjust OPENSSL_DIR in Makefile to match your installation
