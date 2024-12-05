@@ -412,6 +412,7 @@ void phantom_tree_print(const PhantomDaemon* phantom) {
 
 
 // Initialize PhantomID daemon
+
 bool phantom_init(PhantomDaemon* phantom, uint16_t port) {
     if (!phantom) return false;
     
@@ -428,7 +429,6 @@ bool phantom_init(PhantomDaemon* phantom, uint16_t port) {
         .port = port,
         .protocol = NET_TCP,
         .role = NET_SERVER,
-        .mode = NET_BLOCKING,
         .phantom = phantom
     };
     
@@ -455,6 +455,8 @@ bool phantom_init(PhantomDaemon* phantom, uint16_t port) {
     
     return true;
 }
+
+
 void phantom_cleanup(PhantomDaemon* phantom) {
     if (!phantom) return;
     
@@ -646,18 +648,25 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
 // Network callbacks with proper usage of parameters
 void phantom_on_client_connect(NetworkEndpoint* endpoint) {
     char addr[INET_ADDRSTRLEN];
+#ifdef _WIN32
+    InetNtop(AF_INET, &(endpoint->addr.sin_addr), addr, INET_ADDRSTRLEN);
+#else
     inet_ntop(AF_INET, &(endpoint->addr.sin_addr), addr, INET_ADDRSTRLEN);
+#endif
     printf("New client connected from %s:%d\n", addr, 
            ntohs(endpoint->addr.sin_port));
 }
 
 void phantom_on_client_disconnect(NetworkEndpoint* endpoint) {
     char addr[INET_ADDRSTRLEN];
+#ifdef _WIN32
+    InetNtop(AF_INET, &(endpoint->addr.sin_addr), addr, INET_ADDRSTRLEN);
+#else
     inet_ntop(AF_INET, &(endpoint->addr.sin_addr), addr, INET_ADDRSTRLEN);
+#endif
     printf("Client disconnected from %s:%d\n", addr, 
            ntohs(endpoint->addr.sin_port));
 }
-
 // Run daemon
 void phantom_run(PhantomDaemon* phantom) {
     if (!phantom) return;

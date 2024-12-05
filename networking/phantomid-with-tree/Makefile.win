@@ -4,19 +4,20 @@ RM := del /Q
 
 # OpenSSL configuration for Windows
 OPENSSL_DIR := "C:/Program Files/OpenSSL-Win64"
+OPENSSL_LIB := $(OPENSSL_DIR)/lib
 OPENSSL_INCLUDE := -I$(OPENSSL_DIR)/include
-OPENSSL_LIBS := -L$(OPENSSL_DIR)/lib
+OPENSSL_LIBS := -L$(OPENSSL_LIB) -llibssl -llibcrypto
 
 # Windows-specific defines and libraries
 WINDOWS_DEFINES := -D_WIN32 -DWIN32_LEAN_AND_MEAN
-WINDOWS_LIBS := -lws2_32 -ladvapi32 -lcrypt32 -luser32
+WINDOWS_LIBS := -lws2_32 -ladvapi32 -lcrypt32 -luser32 -lgdi32
 
 # Compiler flags
 CFLAGS := -Wall -Wextra -O2 $(OPENSSL_INCLUDE) $(WINDOWS_DEFINES)
 LDFLAGS := -pthread
-LIBS := $(OPENSSL_LIBS) -lssl -lcrypto $(WINDOWS_LIBS)
+LIBS := $(OPENSSL_LIBS) $(WINDOWS_LIBS)
 
-# Directories (Windows style)
+# Directories
 SRC_DIR := .
 OBJ_DIR := obj
 BIN_DIR := bin
@@ -43,15 +44,16 @@ all: check_env $(TARGET)
 .PHONY: check_env
 check_env:
 	@echo Checking build environment...
-	@where gcc > nul 2>&1 || (echo GCC not found in PATH && exit 1)
+	@where gcc >nul 2>&1 || (echo GCC not found in PATH && exit 1)
 	@if not exist $(OPENSSL_DIR) (echo OpenSSL directory not found at $(OPENSSL_DIR) && exit 1)
+	@if not exist $(OPENSSL_LIB) (echo OpenSSL libraries not found at $(OPENSSL_LIB) && exit 1)
 
 # Link the final binary
 $(TARGET): $(OBJS)
 	@echo Linking $(TARGET)...
 	$(CC) $(OBJS) -o $@ $(LDFLAGS) $(LIBS)
 	@echo Build complete.
-	@echo Don't forget to copy required DLLs to $(BIN_DIR):
+	@echo Required DLLs:
 	@echo - $(OPENSSL_DIR)/bin/libssl-3-x64.dll
 	@echo - $(OPENSSL_DIR)/bin/libcrypto-3-x64.dll
 
@@ -60,48 +62,10 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
 	@echo Compiling $<...
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Clean build files
-.PHONY: clean
-clean:
-	@echo Cleaning build files...
-	$(RM) $(OBJ_DIR)\*.o 2>nul || exit 0
-	$(RM) $(BIN_DIR)\*.exe 2>nul || exit 0
-	@echo Clean complete.
-
-# Debug build
-.PHONY: debug
-debug: CFLAGS += -g -DDEBUG
-debug: clean all
-
-# Run the program
-.PHONY: run
-run: $(TARGET)
-	@echo Running PhantomID...
-	$(TARGET)
-
-# Copy DLLs target
+# Copy DLLs
 .PHONY: copy_dlls
 copy_dlls: $(TARGET)
 	@echo Copying OpenSSL DLLs...
-	copy "$(OPENSSL_DIR)\bin\libssl-3-x64.dll" "$(BIN_DIR)" || exit 1
-	copy "$(OPENSSL_DIR)\bin\libcrypto-3-x64.dll" "$(BIN_DIR)" || exit 1
+	copy "$(OPENSSL_DIR)\bin\libssl-3-x64.dll" "$(BIN_DIR)"
+	copy "$(OPENSSL_DIR)\bin\libcrypto-3-x64.dll" "$(BIN_DIR)"
 	@echo DLLs copied successfully.
-
-# Help target
-.PHONY: help
-help:
-	@echo PhantomID Build System for Windows
-	@echo -------------------------------
-	@echo Available targets:
-	@echo   all        - Build the project (default)
-	@echo   clean      - Remove build files
-	@echo   debug      - Build with debug symbols
-	@echo   run        - Build and run the program
-	@echo   copy_dlls  - Copy required OpenSSL DLLs
-	@echo   help       - Show this help message
-	@echo.
-	@echo Requirements:
-	@echo   - MinGW-w64 with POSIX threads
-	@echo   - OpenSSL for Windows (64-bit)
-	@echo.
-	@echo Important: OpenSSL directory is set to $(OPENSSL_DIR)
