@@ -1,19 +1,17 @@
 #include <stdio.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <errno.h>
-#include "phantomid.h"
-
-
 #ifdef _WIN32
-    WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        fprintf(stderr, "Failed to initialize Winsock\n");
-        return 1;
-    }
+    #include <winsock2.h>
+    #include <windows.h>
+    #define sleep(x) Sleep(x * 1000)
+    #define usleep(x) Sleep(x / 1000)
+#else
+    #include <unistd.h>
+    #include <signal.h>
 #endif
+#include "phantomid.h"
 
 static PhantomDaemon phantom_daemon;
 static volatile bool running = true;
@@ -36,7 +34,11 @@ void print_usage(const char* program_name) {
 }
 
 // Initialize signal handlers
-void setup_signals() {
+void setup_signals(void) {
+#ifdef _WIN32
+    signal(SIGINT, handle_signal);
+    signal(SIGTERM, handle_signal);
+#else
     struct sigaction sa = {0};
     sa.sa_handler = handle_signal;
     sigemptyset(&sa.sa_mask);
@@ -44,6 +46,7 @@ void setup_signals() {
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGHUP, &sa, NULL);
+#endif
 }
 
 // Print system status
@@ -53,7 +56,7 @@ void print_status(const PhantomDaemon* phantom) {
     printf("Total Nodes: %zu\n", phantom_tree_size(phantom));
     printf("Root Exists: %s\n", phantom_tree_has_root(phantom) ? "Yes" : "No");
     printf("Tree Depth: %zu\n", phantom_tree_depth(phantom));
-    printf("System Time: %lu\n", phantom_get_time());
+    printf("System Time: %lld\n", (long long)phantom_get_time());
     printf("------------------------\n");
 }
 
@@ -67,12 +70,20 @@ void debug_visitor(PhantomNode* node, void* user_data) {
     
     if (is_verbose) {
         printf("  Children: %zu/%zu\n", node->child_count, node->max_children);
-        printf("  Created: %lu\n", node->account.creation_time);
-        printf("  Expires: %lu\n", node->account.expiry_time);
+        printf("  Created: %llu\n", (unsigned long long)node->account.creation_time);
+        printf("  Expires: %llu\n", (unsigned long long)node->account.expiry_time);
     }
 }
 
 int main(int argc, char* argv[]) {
+#ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        fprintf(stderr, "Failed to initialize Winsock\n");
+        return 1;
+    }
+#endif
+
     uint16_t port = 8888;
     bool verbose = false;
     bool debug = false;
@@ -111,22 +122,21 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Setup signal handlers
     setup_signals();
     
-    // Initialize PhantomID daemon
     printf("Initializing PhantomID daemon on port %d...\n", port);
     if (!phantom_init(&phantom_daemon, port)) {
         fprintf(stderr, "Failed to initialize PhantomID daemon: %s\n", 
                 phantom_get_error());
+#ifdef _WIN32
+        WSACleanup();
+#endif
         return 1;
     }
     
-    // Print initial status
     if (verbose || debug) {
         print_status(&phantom_daemon);
         
-        // Debug tree traversal
         if (debug) {
             printf("\nTree structure (BFS):\n");
             phantom_tree_bfs(&phantom_daemon, debug_visitor, &verbose);
@@ -138,7 +148,6 @@ int main(int argc, char* argv[]) {
     
     printf("\nPhantomID daemon is running. Press Ctrl+C to stop.\n");
     
-    // Main daemon loop
     while (running) {
         phantom_run(&phantom_daemon);
         
@@ -149,14 +158,13 @@ int main(int argc, char* argv[]) {
         usleep(100000); // 100ms
     }
     
-    // Cleanup
     printf("\nCleaning up PhantomID daemon...\n");
     phantom_cleanup(&phantom_daemon);
     printf("PhantomID daemon stopped successfully\n");
     
-    return 0;
-}
-
 #ifdef _WIN32
     WSACleanup();
 #endif
+
+    return 0;
+}
