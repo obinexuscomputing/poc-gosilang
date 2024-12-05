@@ -1,192 +1,191 @@
 # PhantomID Network System
 
-PhantomID is a secure network communication system that implements anonymous account management and messaging capabilities. The system is designed with privacy and security at its core, enabling confidential communication while maintaining user anonymity.
+## Overview
 
-## Project Overview
+PhantomID is an advanced network communication system implementing secure, anonymous account management and messaging capabilities. Leveraging modern cryptographic principles and a hierarchical account structure, PhantomID enables confidential communication while ensuring user privacy and system security.
 
-The project implements a robust client-server architecture utilizing OpenSSL for cryptographic operations and secure communication. The system manages anonymous accounts in a hierarchical tree structure, allowing for organized user relationships while preserving privacy.
+## Core Features
 
-## Project Structure
+The system provides comprehensive security and privacy features through its robust architecture:
 
-The codebase is organized into distinct modules for clarity and maintainability:
+- Cryptographically secure account management using OpenSSL
+- Hierarchical node-based account organization
+- Anonymous messaging infrastructure
+- Real-time network communication
+- Multi-client support with thread safety
+- Configurable security parameters
+
+## Technical Architecture
+
+PhantomID employs a client-server architecture with the following key components:
 
 ```
 phantomid-with-tree/
-├── bin/               # Compiled binaries and runtime libraries
-├── obj/              # Compilation intermediates and object files
-├── -p/               # Project-specific configuration files
-├── main.c            # Program entry point and initialization
-├── network.c         # Network communication implementation
-├── network.h         # Network protocol definitions
-├── phantomid.c       # Core functionality implementation
-├── phantomid.h       # System interface definitions
-├── Makefile          # Build configuration for Unix systems
-├── Makefile.win      # Build configuration for Windows
-└── README.md         # Project documentation
+├── bin/               # Compiled binaries and shared libraries
+├── obj/              # Intermediate build artifacts
+├── -p/               # Project configuration and resources
+├── main.c            # System initialization and entry point
+├── network.c         # Network stack implementation
+├── network.h         # Network protocol specifications
+├── phantomid.c       # Core system implementation
+├── phantomid.h       # Public interface definitions
+├── Makefile          # Unix/Linux build configuration
+├── Makefile.win      # Windows build configuration
+└── README.md         # System documentation
 ```
 
-## System Requirements
+## Development Environment Setup
 
-The development environment requires specific tools based on your operating system:
+### Windows Prerequisites
 
-### Windows Development Environment
-- MinGW-w64 (with POSIX threads support) for C compilation
-- OpenSSL development package (version 3.x) for cryptographic operations
-- Windows 10 or later operating system
-- Git for version control (recommended)
+1. Development Tools:
+   - MinGW-w64 (x86_64-posix-seh) toolchain
+   - Git version control system
+   - Windows 10 or later
 
-### Unix Development Environment
-- GCC compiler suite
-- OpenSSL development libraries and headers
-- POSIX-compliant operating system
-- Make build system
-
-## Installation Guide
-
-### Windows Environment Setup
-
-1. Install MinGW-w64:
-   - Navigate to https://mingw-w64.org/
-   - Download the x86_64 architecture installer
-   - During installation:
-     - Architecture: x86_64
-     - Threads: posix
-     - Exception: seh
-   - Add the installation's bin directory to your system PATH
-
-2. Install OpenSSL:
+2. OpenSSL Installation:
    ```powershell
    winget install ShiningLight.OpenSSL.Dev
    ```
-   After installation:
-   - Copy required DLLs to your project's bin directory:
-     - `libssl-3-x64.dll`
-     - `libcrypto-3-x64.dll`
 
-3. Configure Your Build:
-   Edit Makefile.win to match your OpenSSL installation:
-   ```makefile
-   OPENSSL_DIR := C:/Program Files/OpenSSL-Win64
+3. System Configuration:
+   - Add MinGW-w64 binaries to system PATH
+   - Copy OpenSSL DLLs to runtime directory:
+     ```
+     libssl-3-x64.dll
+     libcrypto-3-x64.dll
+     ```
+
+### Unix/Linux Prerequisites
+
+1. Debian-based Systems (Ubuntu, Debian):
+   ```bash
+   sudo apt-get update
+   sudo apt-get install build-essential git pkg-config libssl-dev
    ```
 
-### Unix Environment Setup
+2. RPM-based Systems (Fedora, RHEL, CentOS):
+   ```bash
+   sudo dnf groupinstall "Development Tools"
+   sudo dnf install openssl-devel git pkg-config
+   ```
 
-Install the required development packages using your system's package manager:
+## Build Process
 
-For Debian-based systems:
-```bash
-sudo apt-get update
-sudo apt-get install gcc make libssl-dev git
-```
-
-For RPM-based systems:
-```bash
-sudo dnf install gcc make openssl-devel git
-```
-
-## Build Instructions
-
-### Windows Build Process
-
-Open Command Prompt in the project directory:
+### Windows Development
 
 ```cmd
-# Full build
+# Initial build
 mingw32-make -f Makefile.win
 
-# Clean build artifacts
+# Clean and rebuild
 mingw32-make -f Makefile.win clean
+mingw32-make -f Makefile.win
 
-# Debug build with symbols
+# Debug build
 mingw32-make -f Makefile.win debug
 
-# Build and execute
+# Build and deploy DLLs
+mingw32-make -f Makefile.win copy_dlls
+
+# Execute application
 mingw32-make -f Makefile.win run
 ```
 
-### Unix Build Process
-
-Open Terminal in the project directory:
+### Unix/Linux Development
 
 ```bash
 # Standard build
 make
 
-# Remove build artifacts
+# Clean build environment
 make clean
 
 # Debug build
 make debug
 
-# Build and execute
+# Execute application
 make run
 ```
 
-## Usage Guide
+## System Configuration
 
-The PhantomID system provides a command-line interface with several configuration options:
+The PhantomID server accepts various runtime configuration options:
 
-Start the server:
-```bash
-bin/phantomid [OPTIONS]
+```
+Usage: phantomid [OPTIONS]
+
+Options:
+  -p, --port PORT    Specify server port (default: 8888)
+  -v, --verbose      Enable detailed operation logging
+  -d, --debug        Enable debug mode with additional output
+  -h, --help         Display detailed usage information
 ```
 
-Configuration options:
-```
--p, --port PORT    Specify listening port (default: 8888)
--v, --verbose      Enable detailed logging
--d, --debug        Enable debug mode
--h, --help         Display usage information
-```
-
-System defaults:
-- Server port: 8888
-- Maximum concurrent clients: 10
-- Network buffer size: 1024 bytes
+System Defaults:
+- Network Port: 8888
+- Maximum Clients: 10
+- Buffer Size: 1024 bytes
+- Default Security Level: High
 
 ## Troubleshooting Guide
 
-### Windows-Specific Issues
+### Common Windows Issues
 
-1. OpenSSL Integration Problems:
-   - Verify OpenSSL installation in Program Files
-   - Ensure DLLs are in the correct location
-   - Check system PATH for OpenSSL binaries
+1. OpenSSL Configuration:
+   - Verify OpenSSL installation path
+   - Check DLL availability in system PATH
+   - Validate DLL versions match build requirements
 
-2. Compilation Errors:
-   - Confirm MinGW-w64 installation
-   - Verify PATH includes MinGW-w64 binaries
-   - Check for correct DLL placement
+2. Build Environment:
+   - Confirm MinGW-w64 installation integrity
+   - Verify environment variables configuration
+   - Check build tool dependencies
 
-### Unix-Specific Issues
+### Common Unix/Linux Issues
 
-1. Library Dependencies:
-   - Verify OpenSSL development files installation
-   - Check system library paths
-   - Ensure correct permissions
+1. OpenSSL Integration:
+   - Verify development headers installation
+   - Check library path configuration
+   - Validate package dependencies
 
-2. Build System Issues:
-   - Clear previous builds with `make clean`
-   - Verify GCC installation
-   - Check for missing dependencies
+2. Compilation:
+   - Clear build artifacts: `make clean`
+   - Check compiler installation
+   - Verify system permissions
 
-## Security Considerations
+## Security Architecture
 
-The system implements several security measures:
-- Anonymous account management
-- Encrypted communication channels
-- Secure message routing
-- Protected user hierarchy
+PhantomID implements multiple security layers:
 
-## License and Legal
+1. Account Management:
+   - Cryptographic identity generation
+   - Secure account hierarchies
+   - Permission-based access control
 
-This software is proprietary and confidential. All rights reserved.
+2. Communication Security:
+   - End-to-end encryption
+   - Secure message routing
+   - Protected network channels
 
-## Support and Contact
+3. System Protection:
+   - Thread-safe operations
+   - Memory protection
+   - Resource isolation
 
-For technical support or inquiries:
-- Report issues through the project management system
-- Contact the development team lead
-- Refer to internal documentation for additional guidance
+## Support and Maintenance
 
-For security-related concerns, please contact the security team immediately.
+Technical Support:
+- Submit issues through project management system
+- Contact development team for urgent matters
+- Reference internal documentation repository
+
+Security Concerns:
+- Report security issues immediately
+- Document unexpected behavior
+- Follow security incident response protocol
+
+## Legal Information
+
+This software is proprietary and confidential. Unauthorized distribution or use is prohibited. All rights reserved.
+
