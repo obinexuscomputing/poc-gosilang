@@ -645,6 +645,7 @@ void phantom_on_client_data(NetworkEndpoint* endpoint, NetworkPacket* packet) {
         printf("Failed to send response to client\n");
     }
 }
+
 // Network callbacks with proper usage of parameters
 void phantom_on_client_connect(NetworkEndpoint* endpoint) {
     char addr[INET_ADDRSTRLEN];

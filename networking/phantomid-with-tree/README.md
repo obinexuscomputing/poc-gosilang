@@ -23,7 +23,6 @@ PhantomID employs a client-server architecture with the following key components
 phantomid-with-tree/
 ├── bin/               # Compiled binaries and shared libraries
 ├── obj/              # Intermediate build artifacts
-├── -p/               # Project configuration and resources
 ├── main.c            # System initialization and entry point
 ├── network.c         # Network stack implementation
 ├── network.h         # Network protocol specifications
@@ -46,6 +45,7 @@ phantomid-with-tree/
 2. OpenSSL Installation:
    ```powershell
    winget install ShiningLight.OpenSSL.Dev
+   winget install Insecure.Nmap # for (netcat)
    ```
 
 3. System Configuration:
